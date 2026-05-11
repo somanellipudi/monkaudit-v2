@@ -50,6 +50,7 @@ jobs:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
       FIRESTORE_DATABASE_ID: ${{ vars.FIRESTORE_DATABASE_ID || '(default)' }}
       GCS_BUCKET: ${{ vars.GCS_BUCKET }}
       ALLOWLIST_EMAILS: ${{ vars.ALLOWLIST_EMAILS }}
@@ -58,11 +59,40 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Validate Google Cloud auth inputs
+        run: |
+          if [[ -z "${GCP_PROJECT_ID}" ]]; then
+            echo "::error::Missing required secret GCP_PROJECT_ID."
+            exit 1
+          fi
+
+          if [[ -n "${GCP_CREDENTIALS_JSON}" && -n "${GCP_WORKLOAD_IDENTITY_PROVIDER}" ]]; then
+            echo "::error::Set either GCP_CREDENTIALS_JSON or GCP_WORKLOAD_IDENTITY_PROVIDER, not both."
+            exit 1
+          fi
+
+          if [[ -z "${GCP_CREDENTIALS_JSON}" && -z "${GCP_WORKLOAD_IDENTITY_PROVIDER}" ]]; then
+            echo "::error::Missing Google Cloud auth. Set GCP_WORKLOAD_IDENTITY_PROVIDER plus GCP_SERVICE_ACCOUNT, or set GCP_CREDENTIALS_JSON."
+            exit 1
+          fi
+
+          if [[ -n "${GCP_WORKLOAD_IDENTITY_PROVIDER}" && -z "${GCP_SERVICE_ACCOUNT}" ]]; then
+            echo "::error::GCP_SERVICE_ACCOUNT is required when using GCP_WORKLOAD_IDENTITY_PROVIDER."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud with Workload Identity
+        if: env.GCP_WORKLOAD_IDENTITY_PROVIDER != ''
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ env.GCP_SERVICE_ACCOUNT }}
+
+      - name: Authenticate to Google Cloud with service account key
+        if: env.GCP_CREDENTIALS_JSON != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ env.GCP_CREDENTIALS_JSON }}
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
