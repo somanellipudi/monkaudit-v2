@@ -685,7 +685,7 @@ export async function getAudit(auditId: string) {
 
 export async function updateAudit(
   auditId: string,
-  input: Partial<Pick<AuditRun, "businessName" | "city" | "country" | "area" | "category" | "sourceLinks" | "auditStatus" | "status" | "assignedStrategist" | "nextFollowUpAt" | "score" | "rating" | "reviewCount" | "hasWebsite" | "hasWhatsApp" | "hasInstagram" | "hasGoogleBusinessProfile" | "discoveredData" | "finalDataUsed" | "rawResearchFileId" | "errorSummary">>
+  input: Partial<Pick<AuditRun, "businessName" | "city" | "country" | "area" | "category" | "auditMode" | "sourceLinks" | "auditStatus" | "status" | "assignedStrategist" | "nextFollowUpAt" | "score" | "rating" | "reviewCount" | "hasWebsite" | "hasWhatsApp" | "hasInstagram" | "hasGoogleBusinessProfile" | "discoveredData" | "finalDataUsed" | "rawResearchFileId" | "errorSummary">>
 ) {
   const db = await readDb();
   const index = db.audit_runs.findIndex((audit) => audit.id === auditId);

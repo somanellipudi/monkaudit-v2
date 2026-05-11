@@ -9,3 +9,5 @@ coverage
 .data
 *.local.json
 *.tsbuildinfo
+.next-dev-server.err.log
+.next-dev-server.log

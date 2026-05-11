@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import clsx from "clsx";
 import {
   BarChart3,
@@ -41,7 +40,7 @@ const navItems = [
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = useBrowserPathname();
   const [user, setUser] = useState<ShellUser>({
     email: "Not signed in",
     name: "GrowingMonk Team",
@@ -124,6 +123,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <MobileNav pathname={pathname} />
     </div>
   );
+}
+
+function useBrowserPathname() {
+  const [pathname, setPathname] = useState("");
+
+  useEffect(() => {
+    const updatePathname = () => setPathname(window.location.pathname);
+    updatePathname();
+    window.addEventListener("popstate", updatePathname);
+    return () => window.removeEventListener("popstate", updatePathname);
+  }, []);
+
+  return pathname;
 }
 
 function Topbar({ monthCost }: { monthCost: number | null }) {

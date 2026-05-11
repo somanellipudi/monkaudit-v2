@@ -1,5 +1,6 @@
 import { ExternalLink, FileDown, Globe2, Instagram, MapPin } from "lucide-react";
 import { AuditWorkspaceBody } from "@/components/AuditWorkspaceBody";
+import { AuditRerunControl } from "@/components/AuditRerunControl";
 import { AuditWorkspaceTabs } from "@/components/AuditWorkspaceTabs";
 import { ReportSaveControl } from "@/components/ReportSaveControl";
 import { Panel, StatusBadge, buttonClassName } from "@/components/ui";
@@ -59,6 +60,7 @@ export function AuditWorkspaceShell({
                 </span>
               )}
             </div>
+            <AuditRerunControl audit={audit} />
             {audit.score > 0 && audit.leadId ? (
               <div className="mt-4 border-t border-stoneLine pt-4">
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Review Controls</p>

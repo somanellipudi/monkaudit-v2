@@ -962,6 +962,8 @@ async function collectPublicSourceSignals(audit: AuditRun): Promise<PublicSource
   const verifiedFacts: string[] = [];
   const limitations: string[] = [];
   let websiteHtml = "";
+  let title = "";
+  let description = "";
   let externalApiCalls = 0;
   let googleProfile: PublicSourceResearch["googleProfile"];
   let googleReviews: PublicSourceResearch["googleReviews"];
@@ -988,6 +990,9 @@ async function collectPublicSourceSignals(audit: AuditRun): Promise<PublicSource
   } else {
     limitations.push("No website URL was provided.");
   }
+
+  title = extractFirst(websiteHtml, /<title[^>]*>([\s\S]*?)<\/title>/i);
+  description = extractFirst(websiteHtml, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i);
 
   if (hasGoogleBusinessProfile) {
     const googleResult = await resolveGoogleMapsProfile(googleMapsUrl);
@@ -1031,6 +1036,27 @@ async function collectPublicSourceSignals(audit: AuditRun): Promise<PublicSource
     if (competitors.length) {
       verifiedFacts.push(`${competitors.length} local competitors were compared through Google Places.`);
     }
+  } else if (website || audit.businessName) {
+    const placesProfile = buildPlacesProfileFromAudit(audit, website, title);
+    const placesResult = await collectGooglePlacesSignals(placesProfile);
+    externalApiCalls += placesResult.externalApiCalls;
+    googleProfile = placesResult.profile;
+    if (placesResult.googleReviews) {
+      googleReviews = placesResult.googleReviews;
+      verifiedFacts.push("Google Places matched the business from the website/name source.");
+      verifiedFacts.push(`Google rating verified through Places: ${googleReviews.rating} from ${googleReviews.reviewCount} reviews.`);
+      if (googleReviews.address) verifiedFacts.push(`Google address verified: ${googleReviews.address}.`);
+      if (googleReviews.phone) verifiedFacts.push("Google phone number is available through Places.");
+      if (placesResult.profile.resolvedUrl) verifiedFacts.push("Google Maps/Profile URL was discovered through Places.");
+    } else {
+      limitations.push("Google Places could not match the business from the website/name source.");
+    }
+    competitors = placesResult.competitors;
+    competitorReviewPosition = placesResult.competitorReviewPosition;
+    placesResult.limitations.forEach((item) => limitations.push(item));
+    if (competitors.length) {
+      verifiedFacts.push(`${competitors.length} local competitors were compared through Google Places.`);
+    }
   } else {
     limitations.push("No Google Maps/Profile URL was provided.");
   }
@@ -1042,8 +1068,6 @@ async function collectPublicSourceSignals(audit: AuditRun): Promise<PublicSource
     instagram.limitations.forEach((item) => limitations.push(item));
   }
 
-  const title = extractFirst(websiteHtml, /<title[^>]*>([\s\S]*?)<\/title>/i);
-  const description = extractFirst(websiteHtml, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["'][^>]*>/i);
   const detectedEmail = extractFirst(websiteHtml, /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   const detectedPhone = extractFirst(websiteHtml, /(?:\+?\d[\d\s().-]{7,}\d)/);
   const hasWhatsApp = /wa\.me|whatsapp|api\.whatsapp/i.test(websiteHtml) || /wa\.me|whatsapp/i.test(audit.sourceLinks?.otherPublicLink || "");
@@ -1065,7 +1089,7 @@ async function collectPublicSourceSignals(audit: AuditRun): Promise<PublicSource
     hasWebsite: Boolean(website && websiteHtml),
     hasWhatsApp,
     hasInstagram,
-    hasGoogleBusinessProfile,
+    hasGoogleBusinessProfile: Boolean(hasGoogleBusinessProfile || googleProfile?.resolvedUrl || googleReviews?.googleMapsUrl),
     rating: googleReviews?.rating || 0,
     reviewCount: googleReviews?.reviewCount || 0,
     title: title ? cleanText(title) : undefined,
@@ -1142,6 +1166,38 @@ function parseGoogleMapsIdentity(value: string, originalUrl: string): NonNullabl
   return profile;
 }
 
+function buildPlacesProfileFromAudit(audit: AuditRun, website: string, title: string): NonNullable<PublicSourceResearch["googleProfile"]> {
+  const businessName = bestBusinessNameForPlaces(audit, website, title);
+  return {
+    businessName,
+    city: audit.city !== "Unknown" ? audit.city : "",
+    area: audit.area,
+    country: audit.country !== "Unknown" ? audit.country : "",
+    category: audit.category !== "Unknown" ? audit.category : inferCategory(`${businessName} ${title}`)
+  };
+}
+
+function bestBusinessNameForPlaces(audit: AuditRun, website: string, title: string) {
+  if (audit.businessName && audit.businessName !== "Prospect from public source") return audit.businessName;
+  const titleName = title
+    .split(/\s[-|]\s/)
+    .map((part) => part.trim())
+    .find(Boolean);
+  if (titleName) return cleanText(titleName);
+  return businessNameFromUrl(website) || audit.businessName;
+}
+
+function businessNameFromUrl(value: string) {
+  if (!value) return "";
+  try {
+    const hostname = new URL(value).hostname.replace(/^www\./, "");
+    const base = hostname.split(".")[0] || "";
+    return cleanGoogleValue(base).replace(/\b\w/g, (character) => character.toUpperCase());
+  } catch {
+    return "";
+  }
+}
+
 function extractGoogleBusinessQuery(value: string) {
   if (!value) return "";
   try {
@@ -1181,6 +1237,7 @@ function inferCategory(value?: string) {
   if (/\bclinic|hospital|care\b/.test(name)) return "Healthcare";
   if (/\bcafe|coffee|restaurant|kitchen|bakery\b/.test(name)) return "Restaurant / Cafe";
   if (/\binterior|design|architect\b/.test(name)) return "Interior Design";
+  if (/\blaundry|dry\s*clean|dryclean|cleaners?\b/.test(name)) return "Laundry / Dry Cleaning";
   return "";
 }
 
@@ -1189,8 +1246,14 @@ function inferCategoryFromTypes(types: string[] = []) {
   if (types.some((type) => ["restaurant", "cafe", "meal_takeaway", "bakery"].includes(type))) return "Restaurant / Cafe";
   if (types.some((type) => ["dentist", "doctor", "hospital", "physiotherapist"].includes(type))) return "Clinic / Wellness";
   if (types.includes("gym")) return "Gym / Fitness";
-  if (types.includes("laundry")) return "Laundry / Dry Cleaning";
+  if (types.some((type) => ["laundry", "clothing_store"].includes(type))) return "Laundry / Dry Cleaning";
   return "";
+}
+
+function bestPlacesCategory(profileCategory: string | undefined, inferredCategory: string) {
+  const category = profileCategory?.trim();
+  if (!category || ["Unknown", "Local Service", "Business"].includes(category)) return inferredCategory || category || "";
+  return category;
 }
 
 function competitorKeyword(category: string) {
@@ -1250,7 +1313,7 @@ async function collectGooglePlacesSignals(profile: NonNullable<PublicSourceResea
 
   let externalApiCalls = 0;
   const limitations: string[] = [];
-  const query = [profile.businessName, profile.area || profile.city].filter(Boolean).join(" ");
+  const query = [profile.businessName, realLocation(profile.area) || realLocation(profile.city) || realLocation(profile.country)].filter(Boolean).join(" ");
   const placeSearch = await fetchPlacesJson("https://maps.googleapis.com/maps/api/place/textsearch/json", { query }, apiKey);
   externalApiCalls += 1;
   if (placeSearch.error) limitations.push(placeSearch.error);
@@ -1269,7 +1332,7 @@ async function collectGooglePlacesSignals(profile: NonNullable<PublicSourceResea
   const nextProfile = {
     ...profile,
     businessName: details.name || candidate.name || profile.businessName,
-    category: profile.category || inferCategoryFromTypes(types) || inferCategory(details.name || candidate.name || profile.businessName),
+    category: bestPlacesCategory(profile.category, inferCategoryFromTypes(types) || inferCategory(details.name || candidate.name || profile.businessName)),
     resolvedUrl: details.url || profile.resolvedUrl,
     placeId: candidate.place_id,
     lat: location?.lat,
@@ -1291,6 +1354,12 @@ async function collectGooglePlacesSignals(profile: NonNullable<PublicSourceResea
 
   if (!location) limitations.push("Google Places details did not include coordinates, so nearby competitors could not be pulled.");
   return { profile: nextProfile, googleReviews, competitors, competitorReviewPosition, limitations, externalApiCalls };
+}
+
+function realLocation(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed || ["unknown", "n/a", "na", "none"].includes(trimmed.toLowerCase())) return "";
+  return trimmed;
 }
 
 async function collectCompetitors(input: { auditName: string; category: string; lat: number; lng: number; ownPlaceId: string; apiKey: string }): Promise<PublicSourceResearch["competitors"]> {

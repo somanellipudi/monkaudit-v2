@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Printer, Save, Send } from "lucide-react";
+import { Download, Save, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui";
 
@@ -103,26 +103,8 @@ export function ReportSaveControl({ auditRunId, leadId, markdown }: { auditRunId
     router.refresh();
   }
 
-  function downloadMarkdown() {
-    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `growth-report-${auditRunId}.md`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setMessage("Report markdown downloaded.");
-  }
-
-  function printPdf() {
-    window.print();
-    setMessage("Print dialog opened. Choose Save as PDF to download a PDF.");
-  }
-
   return (
-    <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-6">
+    <div className="grid min-w-0 gap-2 sm:grid-cols-2 xl:grid-cols-4">
       <Button type="button" variant="secondary" className="w-full justify-center px-3" onClick={() => void saveDraft()} disabled={saving}>
         <Save size={16} /> {saving ? "Saving..." : "Save draft"}
       </Button>
@@ -135,13 +117,7 @@ export function ReportSaveControl({ auditRunId, leadId, markdown }: { auditRunId
       <Button type="button" className="w-full justify-center px-3" onClick={() => void exportPdf()} disabled={saving}>
         <Download size={16} /> Approve export
       </Button>
-      <Button type="button" variant="secondary" className="w-full justify-center px-3" onClick={downloadMarkdown} disabled={saving}>
-        <Download size={16} /> Download report
-      </Button>
-      <Button type="button" variant="secondary" className="w-full justify-center px-3" onClick={printPdf} disabled={saving}>
-        <Printer size={16} /> Print / Save PDF
-      </Button>
-      {message ? <span className="text-sm font-semibold leading-5 text-muted sm:col-span-2 xl:col-span-6">{message}</span> : null}
+      {message ? <span className="text-sm font-semibold leading-5 text-muted sm:col-span-2 xl:col-span-4">{message}</span> : null}
     </div>
   );
 }
