@@ -148,6 +148,7 @@ export function PageTabs({ items }: { items: Array<{ label: string; href: string
           <Link
             key={item.href}
             href={item.href}
+            data-loader-indicator="none"
             className={clsx(
               "whitespace-nowrap border-x border-t border-stoneLine px-4 py-2.5 text-sm font-semibold transition",
               item.active ? "bg-paper text-ink" : "bg-transparent text-muted hover:bg-paper hover:text-ink"

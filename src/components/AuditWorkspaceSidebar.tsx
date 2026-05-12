@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Download, FileText, RotateCcw, Send, ShieldCheck } from "lucide-react";
+import { Download, FileText, RotateCcw, Send, ShieldCheck, Target } from "lucide-react";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { AuditQuickUpdate } from "@/components/AuditQuickUpdate";
 import { AuditRunButton } from "@/components/AuditRunButton";
@@ -28,6 +28,13 @@ export function AuditWorkspaceSidebar({
         <SectionTitle title="Actions" />
         <div className="space-y-2">
           <AuditRunButton auditId={audit.id} isRunning={audit.auditStatus === "Research Running"} generationStatus={generation?.status} />
+          {hasCompletedResearch ? (
+            <Link href={`/sales-audit/${audit.id}/pitch-pack`} className={buttonClassName("primary", "w-full")}>
+              <Target size={16} /> Open Sales Playbook
+            </Link>
+          ) : (
+            <Button className="w-full" disabled><Target size={16} /> Open Sales Playbook</Button>
+          )}
           <PermissionGate permission="report:export">
             {hasCompletedResearch ? (
               <Link href={clientReportHref} className={buttonClassName("primary", "w-full")}>
