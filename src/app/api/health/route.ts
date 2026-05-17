@@ -17,8 +17,10 @@ export async function GET() {
       project: env.googleCloudProject || "not configured",
       location: env.googleCloudLocation,
       gcsBucket: env.gcsBucket || "not configured",
-      geminiModel: env.geminiModel,
-      geminiApiKey: env.geminiApiKey ? "env configured" : `Secret Manager fallback: ${env.geminiApiKeySecret}`,
+      geminiModel: env.geminiProModel,
+      geminiFastModel: env.geminiFastModel,
+      geminiProModel: env.geminiProModel,
+      geminiApiKey: env.geminiApiKey ? "API key env configured" : env.geminiApiKeySecret ? `Secret Manager fallback: ${env.geminiApiKeySecret}` : "ADC / Vertex AI",
       googleMapsApiKey: env.googleMapsApiKey ? "env configured" : `Secret Manager fallback: ${env.googleMapsApiKeySecret}`
     },
     adapters: {

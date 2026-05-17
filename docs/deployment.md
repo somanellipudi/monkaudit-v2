@@ -31,7 +31,13 @@ AUTH_REQUIRED=false
 DB_PROVIDER=local
 LOCAL_DB_PATH=.data/growingmonk-sales-os.json
 ALLOWLIST_EMAILS=you@yourdomain.com,admin@yourdomain.com
+GEMINI_FAST_MODEL=gemini-2.5-flash-lite
+GEMINI_PRO_MODEL=gemini-2.5-pro
 ```
+
+`GEMINI_FAST_MODEL` is used for routine audit generation to keep cost down. `GEMINI_PRO_MODEL` is reserved for audits with richer public-source evidence, competitor/review intelligence, or large prompts. Legacy `GEMINI_MODEL` is still accepted as the pro model fallback.
+
+Gemini generation uses Google ADC / Vertex AI by default. Locally, run `gcloud auth application-default login` or `gcloud auth login`. On Cloud Run, grant the service account Vertex AI access. `GEMINI_API_KEY` and `GEMINI_API_KEY_SECRET` are optional escape hatches only if you want to use the Gemini API key endpoint.
 
 ## Auth Gate
 
@@ -153,7 +159,6 @@ GCS_BUCKET
 Required Google Secret Manager secrets:
 
 ```text
-gemini-api-key
 google-maps-api-key
 ```
 

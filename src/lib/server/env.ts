@@ -9,11 +9,13 @@ export const env = {
     .filter(Boolean),
   googleCloudProject: process.env.GOOGLE_CLOUD_PROJECT ?? "",
   googleCloudLocation: process.env.GOOGLE_CLOUD_LOCATION ?? "asia-south1",
-  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-pro",
+  geminiFastModel: process.env.GEMINI_FAST_MODEL ?? "gemini-2.5-flash-lite",
+  geminiProModel: process.env.GEMINI_PRO_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-2.5-pro",
+  geminiModel: process.env.GEMINI_PRO_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-2.5-pro",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
   firestoreDatabaseId: process.env.FIRESTORE_DATABASE_ID ?? "(default)",
   gcsBucket: process.env.GCS_BUCKET ?? "",
-  geminiApiKeySecret: process.env.GEMINI_API_KEY_SECRET ?? "gemini-api-key",
+  geminiApiKeySecret: process.env.GEMINI_API_KEY_SECRET ?? "",
   googleMapsApiKeySecret: process.env.GOOGLE_MAPS_API_KEY_SECRET ?? "google-maps-api-key"
 };

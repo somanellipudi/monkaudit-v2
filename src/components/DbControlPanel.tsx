@@ -19,6 +19,8 @@ type HealthResponse = {
     location: string;
     gcsBucket: string;
     geminiModel: string;
+    geminiFastModel: string;
+    geminiProModel: string;
     geminiApiKey: string;
     googleMapsApiKey: string;
   };
@@ -102,8 +104,9 @@ export function DbControlPanel() {
         <ReadinessRow label="Auth gate" value={health?.authRequired ? "Required" : "Local bypass"} />
         <ReadinessRow label="Firestore" value={health?.adapters.firestore.ready ? "Ready" : health?.adapters.firestore.mode || "Not configured"} />
         <ReadinessRow label="Storage bucket" value={health?.cloud.gcsBucket || "Not configured"} />
-        <ReadinessRow label="Gemini model" value={health?.cloud.geminiModel || "Not configured"} />
-        <ReadinessRow label="Gemini key" value={health?.cloud.geminiApiKey || "Not configured"} />
+        <ReadinessRow label="Gemini fast model" value={health?.cloud.geminiFastModel || "Not configured"} />
+        <ReadinessRow label="Gemini pro model" value={health?.cloud.geminiProModel || health?.cloud.geminiModel || "Not configured"} />
+        <ReadinessRow label="Gemini auth" value={health?.cloud.geminiApiKey || "Not configured"} />
         <ReadinessRow label="Maps key" value={health?.cloud.googleMapsApiKey || "Not configured"} />
       </div>
 

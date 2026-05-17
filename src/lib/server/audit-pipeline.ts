@@ -175,11 +175,11 @@ export async function runLocalAuditPipeline(audit: AuditRun, options: { requireG
   await recordAiUsage({
     auditRunId: audit.id,
     userId: audit.createdBy,
-    model: env.geminiModel,
+    model: generatedReport.generation.model,
     inputTokens: generatedReport.inputTokens,
     outputTokens: generatedReport.outputTokens,
     externalApiCalls: research.externalApiCalls,
-    estimatedUsd: generatedReport.generation.status === "gemini_generated" ? 0.02 : 0.01,
+    estimatedUsd: estimateGeminiCost(generatedReport.generation.model, generatedReport.inputTokens, generatedReport.outputTokens, generatedReport.generation.status),
     status: "Succeeded"
   });
 
@@ -461,23 +461,24 @@ ${facts.length ? facts.map((fact) => `- Observed: ${fact}`).join("\n") : "- Need
 }
 
 async function generateGeminiAuditReport(audit: AuditRun, research: PublicSourceResearch, narrative: CuratedAudit): Promise<GeneratedAuditReport> {
+  const prompt = buildGeminiAuditPrompt(audit, research, narrative);
+  const modelSelection = selectGeminiModel(prompt, research);
   const fallback = {
     clientReportMarkdown: "",
     internalBriefMarkdown: "",
     salesCallNotesMarkdown: "",
-    inputTokens: estimateTokens(JSON.stringify({ audit, research, narrative })),
+    inputTokens: estimateTokens(prompt),
     outputTokens: 0,
     generation: {
       provider: "fallback" as const,
-      model: env.geminiModel,
+      model: modelSelection.model,
       status: "fallback_no_api_key" as const,
       generatedAt: new Date().toISOString()
     }
   };
 
-  const prompt = buildGeminiAuditPrompt(audit, research, narrative);
   try {
-    const response = await callGemini(prompt);
+    const response = await callGemini(prompt, modelSelection.model);
 
     if (!response.ok) {
       const errorBody = await response.text().catch(() => "");
@@ -485,12 +486,14 @@ async function generateGeminiAuditReport(audit: AuditRun, research: PublicSource
         ...fallback,
         generation: {
           provider: "fallback",
-          model: env.geminiModel,
+          model: modelSelection.model,
           status: "fallback_generation_failed",
           generatedAt: new Date().toISOString(),
           error: `Gemini returned HTTP ${response.status}${errorBody ? `: ${errorBody.slice(0, 500)}` : ""}`,
           promptVersion: "growth-os-v2-monkaudit-places-context",
           promptChars: prompt.length,
+          modelTier: modelSelection.tier,
+          modelReason: modelSelection.reason,
           apiStatus: String(response.status)
         }
       };
@@ -515,11 +518,13 @@ async function generateGeminiAuditReport(audit: AuditRun, research: PublicSource
       outputTokens: Number(payload.usageMetadata?.candidatesTokenCount || estimateTokens(clientReportMarkdown + internalBriefMarkdown + salesCallNotesMarkdown)),
       generation: {
         provider: "gemini",
-        model: env.geminiModel,
+        model: modelSelection.model,
         status: "gemini_generated",
         generatedAt: new Date().toISOString(),
         promptVersion: "growth-os-v2-monkaudit-places-context",
         promptChars: prompt.length,
+        modelTier: modelSelection.tier,
+        modelReason: modelSelection.reason,
         responseChars: text.length,
         finishReason,
         responsePreview: text.slice(0, 500)
@@ -530,18 +535,20 @@ async function generateGeminiAuditReport(audit: AuditRun, research: PublicSource
       ...fallback,
       generation: {
         provider: "fallback",
-        model: env.geminiModel,
+        model: modelSelection.model,
         status: "fallback_generation_failed",
         generatedAt: new Date().toISOString(),
         error: error instanceof Error ? error.message : "Unknown Gemini generation failure.",
         promptVersion: "growth-os-v2-monkaudit-places-context",
-        promptChars: prompt.length
+        promptChars: prompt.length,
+        modelTier: modelSelection.tier,
+        modelReason: modelSelection.reason
       }
     };
   }
 }
 
-async function callGemini(prompt: string) {
+async function callGemini(prompt: string, model: string) {
   const body = {
     contents: [
       {
@@ -568,7 +575,7 @@ async function callGemini(prompt: string) {
 
   const geminiApiKey = await configuredSecret(env.geminiApiKey, env.geminiApiKeySecret);
   if (geminiApiKey) {
-    return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.geminiModel)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`, {
+    return fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(geminiApiKey)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -583,7 +590,7 @@ async function callGemini(prompt: string) {
   const accessToken = await googleAdcAccessToken();
   const location = env.googleCloudLocation || "global";
   const vertexLocation = location === "asia-south1" ? "global" : location;
-  const url = `https://aiplatform.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(vertexLocation)}/publishers/google/models/${encodeURIComponent(env.geminiModel)}:generateContent`;
+  const url = `https://aiplatform.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/locations/${encodeURIComponent(vertexLocation)}/publishers/google/models/${encodeURIComponent(model)}:generateContent`;
   return fetch(url, {
     method: "POST",
     headers: {
@@ -592,6 +599,38 @@ async function callGemini(prompt: string) {
     },
     body: JSON.stringify(body)
   });
+}
+
+function selectGeminiModel(prompt: string, research: PublicSourceResearch) {
+  const sampleReviewCount = research.googleReviews?.sampleReviewCount || 0;
+  const competitorCount = research.competitors.length;
+  const hasRichCompetitorSignals = research.competitors.some((competitor) => competitor.sampleReviewCount >= 3 || competitor.whyDoingBetter.length >= 2);
+  const hasReviewIntelligence = sampleReviewCount >= 3 || (research.googleReviews?.reviewInsights.length || 0) >= 3;
+  const hasMultipleChannels = [research.hasWebsite, research.hasInstagram, research.hasGoogleBusinessProfile].filter(Boolean).length >= 2;
+  const isLargePrompt = estimateTokens(prompt) > 12000;
+
+  if (isLargePrompt || hasRichCompetitorSignals || (hasReviewIntelligence && competitorCount >= 3) || (hasMultipleChannels && competitorCount >= 4)) {
+    return {
+      tier: "pro" as const,
+      model: env.geminiProModel,
+      reason: isLargePrompt ? "large_prompt" : "rich_public_research"
+    };
+  }
+
+  return {
+    tier: "fast" as const,
+    model: env.geminiFastModel,
+    reason: "routine_audit_generation"
+  };
+}
+
+function estimateGeminiCost(model: string, inputTokens: number, outputTokens: number, status: GeneratedAuditReport["generation"]["status"]) {
+  if (status !== "gemini_generated") return 0.01;
+  const normalizedModel = model.toLowerCase();
+  const isPro = normalizedModel.includes("pro");
+  const inputPerMillion = isPro ? 1.25 : 0.3;
+  const outputPerMillion = isPro ? 10 : 2.5;
+  return Number((((inputTokens / 1_000_000) * inputPerMillion) + ((outputTokens / 1_000_000) * outputPerMillion)).toFixed(4));
 }
 
 async function googleCloudProjectId() {
@@ -947,6 +986,8 @@ type GeneratedAuditReport = {
     error?: string;
     promptVersion?: string;
     promptChars?: number;
+    modelTier?: "fast" | "pro";
+    modelReason?: string;
     responseChars?: number;
     finishReason?: string;
     responsePreview?: string;
