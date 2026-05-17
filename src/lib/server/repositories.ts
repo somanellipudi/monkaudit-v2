@@ -385,6 +385,34 @@ export async function listReportsForAudit(auditRunId: string) {
   return db.reports.filter((report) => report.auditRunId === auditRunId);
 }
 
+export async function deleteReport(reportId: string, actorId = currentActorEmail()) {
+  const db = await readDb();
+  const report = db.reports.find((item) => item.id === reportId);
+  if (!report) return null;
+
+  const now = new Date().toISOString();
+  const linkedFileIds = db.files.filter((file) => file.reportId === reportId).map((file) => file.id);
+  db.reports = db.reports.filter((item) => item.id !== reportId);
+  db.files = db.files.filter((file) => file.reportId !== reportId);
+  db.activity_logs.unshift({
+    id: id("log"),
+    actorId,
+    action: "report.deleted",
+    entityType: "reports",
+    entityId: reportId,
+    before: {
+      auditRunId: report.auditRunId,
+      leadId: report.leadId,
+      type: report.type,
+      reportStatus: report.reportStatus,
+      linkedFileIds
+    },
+    createdAt: now
+  });
+  await writeDb(db);
+  return report;
+}
+
 export async function saveReport(input: Partial<Report> & { auditRunId: string; leadId: string; type: Report["type"] }) {
   const db = await readDb();
   const now = new Date().toISOString();

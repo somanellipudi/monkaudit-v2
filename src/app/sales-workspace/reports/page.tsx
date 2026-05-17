@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, FileText, ShieldCheck } from "lucide-react";
 import { ShellPage } from "@/components/AppShell";
+import { ReportDeleteButton } from "@/components/ReportDeleteButton";
 import { EmptyState, PageHeader, Panel, SectionTitle, StatusBadge } from "@/components/ui";
 import { listAudits, listReports } from "@/lib/server/repositories";
 import type { Report } from "@/lib/types";
@@ -49,7 +50,7 @@ export default async function ReportsPage() {
               {reportQueue.map((report) => {
                 const audit = auditById.get(report.auditRunId);
                 return (
-                  <div key={report.id} className="grid gap-3 border-b border-stoneLine pb-4 last:border-0 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <div key={report.id} className="grid gap-3 border-b border-stoneLine pb-4 last:border-0 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
                     <div className="min-w-0">
                       <Link href={`/sales-audit/${report.auditRunId}/client-report`} className="truncate font-semibold text-ink hover:text-monk">
                         {audit?.businessName || report.leadId}
@@ -62,6 +63,7 @@ export default async function ReportsPage() {
                       <StatusBadge status={report.reportStatus} />
                     </Link>
                     <Link href={`/sales-audit/${report.auditRunId}/client-report`} className="text-sm font-semibold text-monk">Open report</Link>
+                    <ReportDeleteButton reportId={report.id} reportName={audit?.businessName || report.leadId} />
                   </div>
                 );
               })}

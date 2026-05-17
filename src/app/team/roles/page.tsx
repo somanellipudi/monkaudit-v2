@@ -14,7 +14,7 @@ const visibilityRules = [
 const permissionGroups = [
   ["MonkAudit", "audit:create", "audit:view", "audit:run", "audit:retry"],
   ["Leads", "leads:create", "leads:view_own", "leads:view_team", "leads:view_all", "leads:edit", "leads:assign"],
-  ["Reports", "report:view", "report:review", "report:approve", "report:export", "reports:override_export"],
+  ["Reports", "report:view", "report:review", "report:approve", "report:export", "report:delete", "reports:override_export"],
   ["Follow-ups", "followup:create", "followup:complete"],
   ["Admin", "users:manage", "ai_usage:view", "settings:manage"]
 ];

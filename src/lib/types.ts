@@ -87,6 +87,7 @@ export type Permission =
   | "report:review"
   | "report:approve"
   | "report:export"
+  | "report:delete"
   | "followup:create"
   | "followup:complete"
   | "users:manage"
